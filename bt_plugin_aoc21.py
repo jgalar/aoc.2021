@@ -48,19 +48,22 @@ class AOC21Source(
     bt2._UserSourceComponent, message_iterator_class=AOC21SourceValuesIterator
 ):
     def __init__(self, config, params, obj):
-        if "path" not in params:
-            raise ValueError("AOC21Source: missing `path` parameter")
+        if "inputs" not in params:
+            raise ValueError("{}: missing `inputs` parameter".format(type(self)))
 
-        path = params["path"]
+        if type(params["inputs"]) is not bt2._ArrayValueConst:
+            raise TypeError("{}: unexpected `inputs` parameter type, got a {}".format(type(self), type(params["inputs"])))
 
-        if type(path) != bt2._StringValueConst:
+        input_path = params["inputs"][0]
+
+        if type(input_path) != bt2._StringValueConst:
             raise TypeError(
-                "AOC21Source: expecting `path` parameter to be a string, got a {}".format(
-                    type(path)
+                "AOC21Source: expecting `inputs[0]` parameter to be a string, got a {}".format(
+                    type(input_path)
                 )
             )
 
-        values_file = open(str(path), "r")
+        values_file = open(str(input_path), "r")
 
         tc = self._create_trace_class()
         cc = self._create_clock_class()
@@ -77,6 +80,17 @@ class AOC21Source(
 
         self._add_output_port("the-values", (values_file, ping_event_ec))
 
+    @staticmethod
+    def _user_query(query_executor, obj, params, log_level):
+        if obj == "babeltrace.support-info":
+            if params["type"] == "file" and str(params["input"]).endswith(".aoc21"):
+                w = 0.25
+            else:
+                w = 0.0
+
+            return {"weight": w}
+        else:
+            raise bt2.UnknownObject
 
 class WindowSum:
     def __init__(self, size: int):

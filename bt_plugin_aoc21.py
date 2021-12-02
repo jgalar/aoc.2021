@@ -78,12 +78,35 @@ class AOC21Source(
         self._add_output_port("the-values", (values_file, ping_event_ec))
 
 
+class WindowSum:
+    def __init__(self, size: int):
+        self._size = size
+        self._values = []
+
+    def add_value(self, value: int):
+        if len(self._values) >= 3:
+            raise RuntimeError
+        self._values.append(value)
+
+    @property
+    def is_full(self) -> bool:
+        return len(self._values) == 3
+
+    @property
+    def sum(self) -> int:
+        return sum(self._values)
+
+    def clear(self):
+        self._values.clear()
+
+
 @bt2.plugin_component_class
 class AOC21Sink(bt2._UserSinkComponent):
     def __init__(self, config, params, obj):
         self._port = self._add_input_port("holiday-spirit")
-        self._previous_depth = None
         self._increase_count = 0
+        self._last_completed_window_sum = None
+        self._windows = []
 
     def _user_graph_is_configured(self):
         self._it = self._create_message_iterator(self._port)
@@ -93,9 +116,24 @@ class AOC21Sink(bt2._UserSinkComponent):
 
         if type(msg) is bt2._EventMessageConst:
             depth = msg.event["depth"]
-            if self._previous_depth and depth > self._previous_depth:
-                self._increase_count = self._increase_count + 1
-            self._previous_depth = depth
+
+            # Initialize windows one after the other to maintain an offset
+            # between them
+            if len(self._windows) < 3:
+                self._windows.append(WindowSum(3))
+
+            for window in self._windows:
+                window.add_value(depth)
+                if window.is_full:
+                    if (
+                        self._last_completed_window_sum
+                        and window.sum > self._last_completed_window_sum
+                    ):
+                        self._increase_count = self._increase_count + 1
+
+                    self._last_completed_window_sum = window.sum
+                    window.clear()
+
         elif type(msg) is bt2._StreamEndMessageConst:
             print(self._increase_count)
             raise bt2.Stop

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+babeltrace2 --plugin-path=. \
+    --component source.aoc21.AOC21Source --params path="$1" \
+    --component sink.aoc21.AOC21Sink

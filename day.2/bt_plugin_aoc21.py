@@ -113,7 +113,7 @@ class AOC21Source(
 
 class Position:
     def __init__(self):
-        self._horizontal = self._depth = 0
+        self._horizontal = self._depth = self._aim = 0
 
     @property
     def horizontal(self) -> int:
@@ -131,10 +131,14 @@ class Position:
     def depth(self, val: int):
         self._depth = val
 
+
 class AOC21FilterPositionsIterator(bt2._UserMessageIterator):
     def __init__(self, config, output_port):
         self._position = Position()
-        input_port = output_port.user_data
+        self._aim = 0
+
+        input_port_name = next(iter(self._component._input_ports))
+        input_port = self._component._input_ports[input_port_name]
 
         self._upstream_it = self._create_message_iterator(input_port)
 
@@ -169,6 +173,8 @@ class AOC21FilterPositionsIterator(bt2._UserMessageIterator):
             msg = self._stream_begin_msg
             self._stream_begin_msg = None
             return msg
+        if self._stream_end_msg is None:
+            raise StopIteration
 
         try:
             while True:
@@ -180,17 +186,16 @@ class AOC21FilterPositionsIterator(bt2._UserMessageIterator):
                 msg = self._stream_end_msg
                 self._stream_end_msg = None
                 return msg
-            else:
-                raise e
 
         direction = str(msg.event["direction"].labels[0])
         distance = msg.event["distance"]
         if direction == "forward":
             self._position.horizontal = self._position.horizontal + distance
+            self._position.depth = self._position.depth + (self._aim * distance)
         elif direction == "up":
-            self._position.depth = self._position.depth - distance
+            self._aim = self._aim - distance
         elif direction == "down":
-            self._position.depth = self._position.depth + distance
+            self._aim = self._aim + distance
 
         event_msg = self._create_event_message(
             self._new_postion_event_ec,
@@ -208,8 +213,8 @@ class AOC21Filter(
     bt2._UserFilterComponent, message_iterator_class=AOC21FilterPositionsIterator
 ):
     def __init__(self, config, params, obj):
-        self._in_port = self._add_input_port("commands-in")
-        self._add_output_port("positions-out", self._in_port)
+        self._add_input_port("commands-in")
+        self._add_output_port("positions-out")
 
 
 @bt2.plugin_component_class
